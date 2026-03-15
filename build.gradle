@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '1.11-SNAPSHOT'
+	id 'fabric-loom' version '1.13.3'
 	id 'maven-publish'
 }
 
@@ -60,6 +60,7 @@ jar {
 
 loom {
 	accessWidenerPath = file("src/main/resources/ui_utils.accesswidener")
+	enableModProvidedJavadoc.set(false)
 }
 
 // configure the maven publication

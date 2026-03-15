@@ -14,7 +14,6 @@
     "ScreenMixin",
     "SignEditScreenMixin",
     "SleepingChatScreenMixin",
-    "TitleScreenMixin",
     "accessor.ClientConnectionAccessor",
     "accessor.ScreenAccessor"
   ],

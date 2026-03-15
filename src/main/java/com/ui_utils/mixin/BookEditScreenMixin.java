@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.BookEditScreen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,13 +28,15 @@ public class BookEditScreenMixin extends Screen {
     @Inject(at = @At("TAIL"), method = "init")
     public void init(CallbackInfo ci) {
         if (SharedVariables.enabled) {
-            MainClient.createWidgets(mc, this);
+            int columnBottom = MainClient.createWidgets(mc, this);
+            int maxChatY = Math.max(1, this.height - MainClient.UI_CHAT_FIELD_HEIGHT - 1);
+            int chatFieldY = Math.min(columnBottom + MainClient.UI_CHAT_FIELD_SPACING, maxChatY);
 
             // create chat box
-            TextFieldWidget addressField = new TextFieldWidget(textRenderer, 5, 245, 160, 20, Text.of("Chat ...")) {
+            TextFieldWidget addressField = new TextFieldWidget(textRenderer, MainClient.UI_TOOLBOX_COLUMN_X, chatFieldY, MainClient.UI_CHAT_FIELD_WIDTH, MainClient.UI_CHAT_FIELD_HEIGHT, Text.of("Chat ...")) {
                 @Override
-                public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-                    if (keyCode == GLFW.GLFW_KEY_ENTER) {
+                public boolean keyPressed(KeyInput keyInput) {
+                    if (keyInput.getKeycode() == GLFW.GLFW_KEY_ENTER) {
                         if (this.getText().equals("^toggleuiutils")) {
                             SharedVariables.enabled = !SharedVariables.enabled;
                             if (mc.player != null) {
@@ -54,11 +57,11 @@ public class BookEditScreenMixin extends Screen {
 
                         this.setText("");
                     }
-                    return super.keyPressed(keyCode, scanCode, modifiers);
+                        return super.keyPressed(keyInput);
                 }
             };
             addressField.setText("");
-            addressField.setMaxLength(255);
+            addressField.setMaxLength(MainClient.UI_CHAT_FIELD_MAX_LENGTH);
 
             this.addDrawableChild(addressField);
         }

@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
@@ -29,7 +30,7 @@ public abstract class HandledScreenMixin extends Screen {
     }
 
     @Shadow
-    protected abstract boolean handleHotbarKeyPressed(int keyCode, int scanCode);
+    protected abstract boolean handleHotbarKeyPressed(KeyInput keyInput);
     @Shadow
     protected abstract void onMouseClick(Slot slot, int slotId, int button, SlotActionType actionType);
     @Shadow
@@ -46,13 +47,15 @@ public abstract class HandledScreenMixin extends Screen {
     @Inject(at = @At("TAIL"), method = "init")
     public void init(CallbackInfo ci) {
         if (SharedVariables.enabled) {
-            MainClient.createWidgets(mc, this);
+            int columnBottom = MainClient.createWidgets(mc, this);
+            int maxChatY = Math.max(1, this.height - MainClient.UI_CHAT_FIELD_HEIGHT - 1);
+            int chatFieldY = Math.min(columnBottom + MainClient.UI_CHAT_FIELD_SPACING, maxChatY);
 
             // create chat box
-            this.addressField = new TextFieldWidget(this.textRenderer, 5, 245, 160, 20, Text.of("Chat ...")) {
+            this.addressField = new TextFieldWidget(this.textRenderer, MainClient.UI_TOOLBOX_COLUMN_X, chatFieldY, MainClient.UI_CHAT_FIELD_WIDTH, MainClient.UI_CHAT_FIELD_HEIGHT, Text.of("Chat ...")) {
                 @Override
-                public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-                    if (keyCode == GLFW.GLFW_KEY_ENTER) {
+                public boolean keyPressed(KeyInput keyInput) {
+                    if (keyInput.getKeycode() == GLFW.GLFW_KEY_ENTER) {
                         if (this.getText().equals("^toggleuiutils")) {
                             SharedVariables.enabled = !SharedVariables.enabled;
                             if (mc.player != null) {
@@ -74,32 +77,37 @@ public abstract class HandledScreenMixin extends Screen {
 
                         this.setText("");
                     }
-                    return super.keyPressed(keyCode, scanCode, modifiers);
+                    return super.keyPressed(keyInput);
                 }
             };
             this.addressField.setText("");
-            this.addressField.setMaxLength(256);
+            this.addressField.setMaxLength(MainClient.UI_CHAT_FIELD_MAX_LENGTH);
 
             this.addDrawableChild(this.addressField);
         }
     }
 
-    @Inject(at = @At("HEAD"), method = "keyPressed", cancellable = true)
-    public void keyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
-        cir.cancel();
-        if (super.keyPressed(keyCode, scanCode, modifiers)) {
+    @Inject(at = @At("HEAD"), method = "keyPressed(Lnet/minecraft/client/input/KeyInput;)Z", cancellable = true)
+    public void keyPressed(KeyInput keyInput, CallbackInfoReturnable<Boolean> cir) {
+        if (this.addressField != null && this.addressField.isSelected() && this.addressField.keyPressed(keyInput)) {
+            cir.cancel();
             cir.setReturnValue(true);
-        } else if (MainClient.mc.options.inventoryKey.matchesKey(keyCode, scanCode) && (this.addressField == null || !this.addressField.isSelected())) {
+            return;
+        }
+        cir.cancel();
+        if (super.keyPressed(keyInput)) {
+            cir.setReturnValue(true);
+        } else if (MainClient.mc.options.inventoryKey.matchesKey(keyInput) && (this.addressField == null || !this.addressField.isSelected())) {
             // Crashes if address field does not exist (because of ui utils disabled, this is a temporary fix.)
             this.close();
             cir.setReturnValue(true);
         } else {
-            this.handleHotbarKeyPressed(keyCode, scanCode);
+            this.handleHotbarKeyPressed(keyInput);
             if (this.focusedSlot != null && this.focusedSlot.hasStack()) {
-                if (mc.options.pickItemKey.matchesKey(keyCode, scanCode)) {
+                if (mc.options.pickItemKey.matchesKey(keyInput)) {
                     this.onMouseClick(this.focusedSlot, this.focusedSlot.id, 0, SlotActionType.CLONE);
-                } else if (mc.options.dropKey.matchesKey(keyCode, scanCode)) {
-                    this.onMouseClick(this.focusedSlot, this.focusedSlot.id, hasControlDown() ? 1 : 0, SlotActionType.THROW);
+                } else if (mc.options.dropKey.matchesKey(keyInput)) {
+                    this.onMouseClick(this.focusedSlot, this.focusedSlot.id, isControlDown(keyInput) ? 1 : 0, SlotActionType.THROW);
                 }
             }
 
@@ -107,14 +115,8 @@ public abstract class HandledScreenMixin extends Screen {
         }
     }
 
-    // inject at the end of the render method
-    @Inject(at = @At("TAIL"), method = "render")
-    public void render(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        // display sync id, revision, if ui utils is enabled
-        // this hurts me physically to look at this in a render method :(
-        // im too lazy to fix it tho :D
-        if (SharedVariables.enabled) {
-            MainClient.createText(mc, context, this.textRenderer);
-        }
+    private static boolean isControlDown(KeyInput keyInput) {
+        return (keyInput.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0;
     }
+
 }
